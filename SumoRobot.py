@@ -30,6 +30,7 @@ DPAD_LEFT = 0x08
 
 
 AXIS_SCALE = 5.12
+THROTLE_SCALE = 10.24
 
 # Setup
 moveMotors = [ port.C.motor, port.D.motor ]
@@ -44,11 +45,11 @@ strafeRightFuncs = [
     sine_wave(), sine_wave(100, 1000, 250)
 ]
 
-hub = MSHub()
-wheelPair = MotorPair('C', 'D') # left and right wheel
-
-moveMech = Mechanism(moveMotors, strafeLeftFuncs)
-moveMech.shortest_path_reset()
+legoHub = MSHub()
+wheelPair = port.C.motor.pair(port.D.motor)
+flipPair = port.E.motor.pair(port.F.motor)
+#moveMech = Mechanism(moveMotors, strafeLeftFuncs)
+#moveMech.shortest_path_reset()
 
 # Start control loop
 timer= AMHTimer()
@@ -56,18 +57,28 @@ timer= AMHTimer()
 while 1:
     ack, pad = ur.call('gamepad')
     if ack=="gamepadack":
-        btns, dpad, left_x, left_y, right_x, right_y = pad
+        btns, dpad, left_x, left_y, right_x, right_y, throtle, back = pad
     else:
-        btns, dpad, left_x, left_y, right_x, right_y = [0]*6
+        btns, dpad, left_x, left_y, right_x, right_y, throtle, back = [0]*8
     #get scaled turn value between -100 and 100
-    turn = left_x/AXIS_SCALE
+    turn = left_x/AXIS_SCALE/2
     
-    if btns & BTN_R2:
-        wheelPair.pwm(clamp_int(-100 - turn), clamp_int(100 - turn))
-    elif btns & BTN_L2:
-        wheelPair.pwm(clamp_int(100 - turn), clamp_int(-100 - turn))
+    #flip function
+    if btns & BTN_X:
+        flipPair.run_to_position(-150, 150)
     else:
-        wheelPair.pwm(0, 0)
+        flipPair.run_to_position(0, 0)
+
+
+    if btns & BTN_R2:
+        #get scaled speed value between -100 and 100
+        speed = throtle/THROTLE_SCALE
+        wheelPair.pwm(clamp_int(-speed - turn), clamp_int(speed - turn))
+    elif btns & BTN_L2:
+        speed = back/THROTLE_SCALE
+        wheelPair.pwm(clamp_int(speed - turn), clamp_int(-speed - turn))
+    else:
+        wheelPair.pwm(0,0)
 
 
 
@@ -75,5 +86,5 @@ while 1:
 
     
 
-moveMech.stop()
+#moveMech.stop()
 
