@@ -38,22 +38,24 @@ flipMotors = [ port.E.motor, port.F.motor ]
 ur = SerialTalk( MSHubSerial('B'), timeout=20)
 # Motion functions for syncronized motors
 strafeLeftFuncs = [
-    sine_wave(), sine_wave(100, 1000, 250)
+    sine_wave(150, 1000, 0), sine_wave(100, 1000, 250)
 ]
 
 strafeRightFuncs = [
-    sine_wave(), sine_wave(100, 1000, 250)
+    sine_wave(100, 1000, 250), sine_wave(150, 1000, 0)
 ]
 
 legoHub = MSHub()
 wheelPair = port.C.motor.pair(port.D.motor)
 flipPair = port.E.motor.pair(port.F.motor)
-#moveMech = Mechanism(moveMotors, strafeLeftFuncs)
-#moveMech.shortest_path_reset()
+moveLeftMech = Mechanism(moveMotors, strafeLeftFuncs)
+moveRightMech = Mechanism(moveMotors, strafeRightFuncs)
+#moveLeftMech.shortest_path_reset()
 
 # Start control loop
 timer= AMHTimer()
-
+flipDownStarted = 0
+resetDone = 0
 while 1:
     ack, pad = ur.call('gamepad')
     if ack=="gamepadack":
@@ -64,19 +66,32 @@ while 1:
     turn = left_x/AXIS_SCALE/2
     
     #flip function
-    if btns & BTN_X:
-        flipPair.run_to_position(-150, 150)
-    else:
-        flipPair.run_to_position(0, 0)
-
+    if (btns & BTN_X):
+        flipPair.run_to_position(-100, 100, speed=100)  
+        flipDownStarted = 0      
+    elif not flipDownStarted :
+        flipPair.run_to_position(0, 0, speed=100)
+        flipDownStarted = 1
 
     if btns & BTN_R2:
         #get scaled speed value between -100 and 100
         speed = throtle/THROTLE_SCALE
         wheelPair.pwm(clamp_int(-speed - turn), clamp_int(speed - turn))
+        resetDone = 0
     elif btns & BTN_L2:
         speed = back/THROTLE_SCALE
         wheelPair.pwm(clamp_int(speed - turn), clamp_int(-speed - turn))
+        resetDone = 0
+    elif dpad & DPAD_LEFT:
+        if not resetDone:
+            moveLeftMech.shortest_path_reset()
+            resetDone = 1
+        moveLeftMech.update_motor_pwms(timer.time)
+    elif dpad & DPAD_RIGHT:
+        if not resetDone:
+            moveRightMech.shortest_path_reset()
+            resetDone = 1
+        moveRightMech.update_motor_pwms(timer.time)
     else:
         wheelPair.pwm(0,0)
 
